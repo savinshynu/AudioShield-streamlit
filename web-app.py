@@ -21,21 +21,40 @@ def load_model(filepath):
 
 def extract_feature(audio_file):
     ydat, samp_rate = librosa.load(audio_file)
+	
+	#No. of samples in 6 sec files
+    len_samp = int(samp_rate*6.0)
 
-    #check number of 2 second files in there
-    nslices = int(np.floor(ydat.shape[0]/(2*samp_rate)))
+    #check number of 6 second files in there
+    nslices = int(np.floor(ydat.shape[0]/len_samp))
 
-    print(f" Number of 2 sec slices: {nslices}")
-
+    print(f" Number of 6 sec slices: {nslices}")
+	
+    len_samp = int(samp_rate*6.0)
     feat_list = []
-    len_samp = int(samp_rate*2.0)
-    #create #nslice mel spectrograms
-    st.spinner(text=f"Processing {nslices} 2  second chunks.")
-    for i in range(nslices):
-        S_mel = librosa.feature.melspectrogram(y=ydat[i*len_samp:(i+1)*len_samp], sr=samp_rate, n_mels=128)
+
+    if nslices == 0:
+		# no. of samples to pad on the right, if data less than 6 seconds
+        pad_right = len_samp - ydat.shape[0]
+        ydat = np.pad(ydat, (0, pad_right)) # padding on the right for shorter audio files
+        S_mel = librosa.feature.melspectrogram(y=ydat, sr=samp_rate, n_mels=128)
         S_mel_db = librosa.amplitude_to_db(S_mel, ref=np.max)
         feat = (S_mel_db - S_mel_db.min())/(S_mel_db.max() - S_mel_db.min())
         feat_list.append(feat)
+    else:
+    	#create #nslice mel spectrograms
+    	st.spinner(text=f"Processing {nslices} 6 second chunks.")
+    for i in range(nslices):
+            yslice = ydat[i*len_samp:(i+1)*len_samp]
+			# no. of samples to pad on the right, if data less than 6 seconds
+            pad_right = len_samp - yslice.shape[0]
+        
+            if pad_right > 0 :
+            	yslice = np.pad(yslice, (0, pad_right)) # padding on the right for shorter audio files
+            S_mel = librosa.feature.melspectrogram(y=yslice, sr=samp_rate, n_mels=128)
+            S_mel_db = librosa.amplitude_to_db(S_mel, ref=np.max)
+            feat = (S_mel_db - S_mel_db.min())/(S_mel_db.max() - S_mel_db.min())
+            feat_list.append(feat)
     return feat_list
 
 def detect_deepfake(model_path, feat_list):
@@ -74,16 +93,16 @@ def main():
         output = detect_deepfake(model_filepath, feature_list)
         
         if output == 0:
-            result = 'Fake Audio'
+            result = 'Genuine'
         else:
-            result = 'Genuine Audio'
+            result = 'Fake'
         st.write(f"The audio file is {result}")
 
 
 if __name__ == '__main__':
     main()
     
-	#file_uploaded = sys.argv[1]
+    #file_uploaded = sys.argv[1]
     #feature_list = extract_feature(file_uploaded)
     #output = detect_deepfake(model_filepath, feature_list)
 
